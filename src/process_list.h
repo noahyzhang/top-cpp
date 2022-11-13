@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <map>
+#include <memory>
 #include "process.h"
 
 /**
@@ -29,10 +30,17 @@ class ProcessListCollection {
 
 
  private:
-    void get_mem_monitor_info();
+    /**
+     * @brief 获取系统整体的内存系统
+     * 
+     */
+    void get_sys_mem_info();
+
+    void get_scan_cpu_time();
 
 
  private:
+    std::shared_ptr<ProcessList> process_list_;
     std::vector<ProcessInfo> process_vec_;
     std::map<pid_t, ProcessInfo> process_map_;
 };
