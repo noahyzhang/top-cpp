@@ -1,6 +1,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "common.h"
 #include "process_list.h"
 
@@ -22,7 +24,8 @@ void ProcessListCollection::get_sys_mem_info() {
 
     FILE* file = fopen(PROC_MEMINFO_FILE, "r");
     if (!file) {
-        FATAL_LOG("cannot open file:" PROC_MEMINFO_FILE);
+        FATAL_LOG("cannot open file: %s, err: %s", PROC_MEMINFO_FILE, strerror(errno));
+        return;
     }
     // 读取 /proc/meminfo 中的数据
     char buf[128];
@@ -35,7 +38,7 @@ void ProcessListCollection::get_sys_mem_info() {
                     (variable) = parse_var;                                   \
                 }                                                             \
                 break;                                                        \
-            } else (void) 0
+            }
 
         switch (buf[0]) {
         case 'M':
@@ -82,10 +85,30 @@ void ProcessListCollection::get_sys_mem_info() {
 }
 
 void ProcessListCollection::get_scan_cpu_time() {
-    uint64_t existing = 0, active = 0;
-    
-    DIR* dir = opendir("/sys/devices/system/cpu");
-    if (!dir) {
-        FATAL_LOG("")
+    uint64_t existing_cpu_num = 0, active_cpu_num = 0;
+
+    const char* dir_name = "/sys/devices/system/cpu";
+    DIR* dir_ptr = opendir(dir_name);
+    if (!dir_ptr) {
+        FATAL_LOG("cannot open dir: %s, err: %s", dir_name, strerror(errno));
+        return;
+    }
+
+    const struct dirent* entry;
+    while ((entry = readdir(dir_ptr)) != NULL) {
+        // 如果不是目录或者类型未知，则跳过
+        if (entry->d_type != DT_DIR && entry->d_type != DT_UNKNOWN) continue;
+        // 如果目录名不是 cpu* ，则跳过
+        if (strncmp(entry->d_name, "cpu", strlen("cpu")) != 0) continue;
+        // 获取 cpu 的 id，比如 cpu1，id 则为 1
+        char* endp;
+        uint64_t id = strtoul(entry->d_name + 3, &endp, 10);
+        if (id == UINT64_MAX || endp == entry->d_name+3 || *endp != '\0') continue;
+        // 获取 "/sys/devices/system/cpu/" 目录下的子目录
+        int cpu_dir_fd = openat(dirfd(dir_ptr), entry->d_name, O_DIRECTORY | O_PATH | O_NOFOLLOW);
+        if (cpu_dir_fd < 0) continue;
+        existing_cpu_num++;
+        
+
     }
 }
